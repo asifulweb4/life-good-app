@@ -1,0 +1,6 @@
+{
+  "name": "Life Good - Online Earning Platform",
+  "description": "An interactive digital micro-job and reselling platform themed around a highly polished white, pink, and purple gradient design. শতভাগ হালাল উপায়ে অনলাইন ইনকাম প্ল্যাটফর্ম।",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
