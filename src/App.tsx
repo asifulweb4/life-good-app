@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Home, ShoppingBag, Wallet, Users, BookOpen, Briefcase, User, Sparkles, Bell, Clock, LogOut, ShieldCheck, ArrowLeft
+  Home, ShoppingBag, Wallet, Users, BookOpen, Briefcase, User, Sparkles, Bell, Clock, LogOut, ShieldCheck, Laptop, ArrowLeft
 } from 'lucide-react';
 
 import { Product, Job, TrainingSection, DriveOffer, EarningsState, Transaction } from './types';
@@ -14,7 +14,7 @@ import TeamReferPanel from './components/TeamReferPanel';
 import WelcomeOfferCourses from './components/WelcomeOfferCourses';
 import MicroJobs from './components/MicroJobs';
 import AuthPortal from './components/AuthPortal';
-import AdminPanel from './components/AdminPanel';
+import AdminMonetizationPanel from './components/AdminMonetizationPanel';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<string>('home');
@@ -25,6 +25,10 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState<any>(() => {
     const saved = localStorage.getItem('currentUser');
     return saved ? JSON.parse(saved) : null;
+  });
+
+  const [isUserVIP, setIsUserVIP] = useState<boolean>(() => {
+    return localStorage.getItem('isUserVIP') === 'true';
   });
 
   const [walletBalance, setWalletBalance] = useState<number>(250.00);
@@ -45,20 +49,11 @@ export default function App() {
     return saved ? JSON.parse(saved) : mockTrainingSections;
   });
 
-  // Clock tick — safe formatter (avoids bn-BD locale crash in some browsers)
+  // Clock tick
   useEffect(() => {
     const tick = () => {
-      try {
-        const now = new Date();
-        let hours = now.getHours();
-        const minutes = now.getMinutes().toString().padStart(2, '0');
-        const seconds = now.getSeconds().toString().padStart(2, '0');
-        const ampm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12 || 12;
-        setCurrentTime(`${hours}:${minutes}:${seconds} ${ampm}`);
-      } catch {
-        setCurrentTime('');
-      }
+      const parts = new Date().toLocaleTimeString('bn-BD', { hour12: true });
+      setCurrentTime(parts);
     };
     tick();
     const interval = setInterval(tick, 1000);
@@ -71,7 +66,7 @@ export default function App() {
       const response = await fetch(`/api/user-profile?email=${encodeURIComponent(email)}`);
       if (response.ok) {
         const data = await response.json();
-        
+
         // Update states based on database records
         if (data.user) {
           setCurrentUser(data.user);
@@ -135,7 +130,7 @@ export default function App() {
       setWalletBalance(Number(data.wallet_balance));
       setTodayEarnings(Number(data.today_earnings));
       setTotalEarnings(Number(data.total_earnings));
-      
+
       const updated = {
         ...currentUser,
         wallet_balance: Number(data.wallet_balance),
@@ -185,7 +180,7 @@ export default function App() {
       status: 'success'
     };
     setTransactions((prev) => [newTx, ...prev]);
-    
+
     // Refresh database profile list
     if (currentUser?.email) {
       fetchUserProfileSync(currentUser.email);
@@ -288,7 +283,7 @@ export default function App() {
       };
       setCurrentUser(updatedUser);
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-      
+
       fetchUserProfileSync(currentUser.email);
       alert(data.message || 'রিকুয়েস্ট সফলভাবে পেন্ডিং করা হয়েছে!');
     } catch (err: any) {
@@ -324,7 +319,7 @@ export default function App() {
       };
       setCurrentUser(updatedUser);
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-      
+
       fetchUserProfileSync(currentUser.email);
       alert(data.message || 'ডিপোজিট সফলভাবে সম্পন্ন হয়েছে!');
       return true;
@@ -359,7 +354,7 @@ export default function App() {
       };
       setCurrentUser(updatedUser);
       localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-      
+
       fetchUserProfileSync(currentUser.email);
       alert(data.message || 'মহৎ অনুদানের জন্য আন্তরিক ধন্যবাদ!');
     } catch (err: any) {
@@ -390,6 +385,73 @@ export default function App() {
     }
   };
 
+  // Callback 9: Manage VIP upgrade or Interactive Sponsor Ad Credit
+  const handleUpgradeToVIP = async (cost: number) => {
+    if (!currentUser) return false;
+
+    const isUpgrade = cost > 0;
+    const isAdReward = cost < 0;
+
+    // Check balance for VIP upgrade
+    if (isUpgrade && walletBalance < cost) {
+      return false;
+    }
+
+    const reward = -cost; // If cost is -0.20, reward is +0.20; if cost is 100, reward is -100
+    const newBalance = walletBalance + reward;
+    const newToday = todayEarnings + (isAdReward ? reward : 0);
+    const newTotal = totalEarnings + (isAdReward ? reward : 0);
+
+    setWalletBalance(newBalance);
+    const updatedUser = {
+      ...currentUser,
+      wallet_balance: newBalance,
+      today_earnings: newToday,
+      total_earnings: newTotal
+    };
+    setCurrentUser(updatedUser);
+    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+
+    if (isUpgrade) {
+      setIsUserVIP(true);
+      localStorage.setItem('isUserVIP', 'true');
+    }
+
+    // Add immediate transaction object
+    const dateStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
+    const newTx: Transaction = {
+      id: `tx_${Date.now()}`,
+      type: isUpgrade ? 'withdrawal' : 'earning',
+      amount: Math.abs(reward),
+      title: isUpgrade ? '👑 আইডি এক্টিভেশন: প্রিমিয়াম VIP পার্টনার' : '🔗 স্পন্সরড বিজ্ঞাপন রিওয়ার্ড',
+      date: dateStr,
+      status: 'success'
+    };
+    setTransactions((prev) => [newTx, ...prev]);
+
+    // Async sync with database
+    try {
+      const response = await fetch('/api/complete-job', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: currentUser.email,
+          jobId: `charge_${Date.now()}`,
+          reward: reward,
+          title: isUpgrade ? '👑 আইডি এক্টিভেশন: প্রিমিয়াম VIP পার্টনার' : '🔗 স্পন্সরড বিজ্ঞাপন রিওয়ার্ড'
+        })
+      });
+      const data = await response.json();
+      if (response.ok) {
+        syncUserLocalData(data);
+      }
+    } catch (err) {
+      console.warn('DB Sync completed on local store: ', err);
+    }
+
+    return true;
+  };
+
   // If user is not logged in, force registration and login first
   if (!currentUser) {
     return <AuthPortal onAuthSuccess={handleAuthSuccess} />;
@@ -397,45 +459,32 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-pink-50 via-purple-50 to-white text-gray-900 pb-24 lg:pb-6 relative font-sans">
-      
+
       {/* Top Professional App Header */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-purple-100 px-4 py-3 shadow-sm select-none">
         <div className="max-w-6xl mx-auto flex justify-between items-center gap-4">
-          
-          <div className="flex items-center gap-3">
-            {/* Back Button (Only on non-home pages) */}
-            {activeTab !== 'home' && (
-              <button
-                onClick={() => handleUpdateTab('home')}
-                className="p-1.5 bg-purple-50 text-purple-700 rounded-full hover:bg-purple-200 transition-colors cursor-pointer border border-purple-100"
-                title="Go Back"
-              >
-                <ArrowLeft size={18} />
-              </button>
-            )}
-            
-            {/* Logo */}
-            <div
-              onClick={() => handleUpdateTab('home')}
-              className="flex items-center gap-2 cursor-pointer group"
-            >
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-purple-700 to-pink-500 flex items-center justify-center text-white font-black text-lg shadow-md shadow-pink-200">
-                LG
-              </div>
-              <div>
-                <span className="font-black text-sm tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-700 to-pink-600">
-                  LIFE GOOD
-                </span>
-                <p className="text-[9px] text-purple-600 font-extrabold tracking-widest uppercase leading-none">
-                  Business
-                </p>
-              </div>
+
+          {/* Logo */}
+          <div
+            onClick={() => handleUpdateTab('home')}
+            className="flex items-center gap-2 cursor-pointer group"
+          >
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-r from-purple-700 to-pink-500 flex items-center justify-center text-white font-black text-lg shadow-md shadow-pink-200">
+              LG
+            </div>
+            <div>
+              <span className="font-black text-sm tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-purple-700 to-pink-600">
+                LIFE GOOD
+              </span>
+              <p className="text-[9px] text-purple-600 font-extrabold tracking-widest uppercase leading-none">
+                Business
+              </p>
             </div>
           </div>
 
           {/* Time & Quick balance trackers */}
           <div className="flex items-center gap-2 sm:gap-4">
-            
+
             {/* Live Bangladesh clock with custom styling (No black) */}
             <div className="hidden sm:flex items-center gap-1 bg-purple-50/70 border border-purple-100 rounded-xl px-2.5 py-1 text-purple-700 font-semibold text-xs font-mono shadow-inner">
               <Clock size={12} className="text-purple-600" />
@@ -467,6 +516,18 @@ export default function App() {
 
       {/* Main interactive tabs content dispatcher */}
       <main className="px-4 py-6 max-w-6xl mx-auto">
+        {activeTab !== 'home' && (
+          <div className="mb-5 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <button
+              onClick={() => handleUpdateTab('home')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100 transition"
+            >
+              <ArrowLeft size={18} />
+              ফিরে যান
+            </button>
+            <p className="text-sm text-gray-600">প্রথম পেজে ফিরে যেতে এই বাটনটি ব্যবহার করতে পারেন।</p>
+          </div>
+        )}
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}
@@ -524,10 +585,17 @@ export default function App() {
                 onJobSuccess={handleJobSuccess}
                 onUpdateJobs={setJobs}
                 userEmail={currentUser.email}
+                transactions={transactions}
+                onNavigateToWallet={() => setActiveTab('wallet')}
               />
             )}
-            {activeTab === 'admin' && currentUser?.email === 'asiful@gmail.com' && (
-              <AdminPanel adminEmail={currentUser.email} />
+            {activeTab === 'owner' && (
+              <AdminMonetizationPanel
+                walletBalance={walletBalance}
+                onUpdateTab={handleUpdateTab}
+                onUpgradeToVIP={handleUpgradeToVIP}
+                isUserVIP={isUserVIP}
+              />
             )}
           </motion.div>
         </AnimatePresence>
@@ -537,9 +605,8 @@ export default function App() {
       <nav className="fixed bottom-0 inset-x-0 bg-white/90 backdrop-blur-md border-t border-purple-100 py-2.5 px-3 z-40 shadow-xl flex justify-around items-center select-none" id="bottom-navigation">
         <button
           onClick={() => handleUpdateTab('home')}
-          className={`flex flex-col items-center gap-1 transition-all ${
-            activeTab === 'home' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
-          }`}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'home' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
+            }`}
           id="nav-tab-home"
         >
           <Home size={18} />
@@ -548,9 +615,8 @@ export default function App() {
 
         <button
           onClick={() => handleUpdateTab('shop')}
-          className={`flex flex-col items-center gap-1 transition-all ${
-            activeTab === 'shop' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
-          }`}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'shop' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
+            }`}
           id="nav-tab-shop"
         >
           <ShoppingBag size={18} />
@@ -559,9 +625,8 @@ export default function App() {
 
         <button
           onClick={() => handleUpdateTab('wallet')}
-          className={`flex flex-col items-center gap-1 transition-all ${
-            activeTab === 'wallet' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
-          }`}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'wallet' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
+            }`}
           id="nav-tab-wallet"
         >
           <Wallet size={18} />
@@ -570,9 +635,8 @@ export default function App() {
 
         <button
           onClick={() => handleUpdateTab('team')}
-          className={`flex flex-col items-center gap-1 transition-all ${
-            activeTab === 'team' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
-          }`}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'team' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
+            }`}
           id="nav-tab-team"
         >
           <Users size={18} />
@@ -581,9 +645,8 @@ export default function App() {
 
         <button
           onClick={() => handleUpdateTab('welcome')}
-          className={`flex flex-col items-center gap-1 transition-all ${
-            activeTab === 'welcome' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
-          }`}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'welcome' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
+            }`}
           id="nav-tab-welcome"
         >
           <BookOpen size={18} />
@@ -592,26 +655,23 @@ export default function App() {
 
         <button
           onClick={() => handleUpdateTab('jobs')}
-          className={`flex flex-col items-center gap-1 transition-all ${
-            activeTab === 'jobs' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
-          }`}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'jobs' ? 'text-purple-700 scale-105 font-extrabold' : 'text-purple-400 hover:text-purple-600'
+            }`}
           id="nav-tab-jobs"
         >
           <Briefcase size={18} />
           <span className="text-[10px]">মাইক্রো কাজ</span>
         </button>
 
-        {currentUser?.email === 'asiful@gmail.com' && (
-          <button
-            onClick={() => handleUpdateTab('admin')}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              activeTab === 'admin' ? 'text-pink-600 scale-105 font-extrabold' : 'text-purple-400 hover:text-pink-500'
+        <button
+          onClick={() => handleUpdateTab('owner')}
+          className={`flex flex-col items-center gap-1 transition-all ${activeTab === 'owner' ? 'text-purple-750 scale-105 font-extrabold text-pink-600 animate-pulse' : 'text-purple-450 hover:text-purple-600'
             }`}
-          >
-            <ShieldCheck size={18} />
-            <span className="text-[10px]">এডমিন</span>
-          </button>
-        )}
+          id="nav-tab-owner"
+        >
+          <Laptop size={18} />
+          <span className="text-[10px] font-bold">ওনার গাইড</span>
+        </button>
       </nav>
 
       {/* User Profile Modal Dialog Card */}
@@ -622,10 +682,10 @@ export default function App() {
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-sm w-full border border-purple-100"
+              className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-sm w-full border border-purple-100 flex flex-col max-h-[90vh]"
               id="profile-panel-modal"
             >
-              <div className="p-5 bg-gradient-to-r from-purple-700 to-pink-500 text-white flex flex-col items-center text-center relative overflow-hidden select-none">
+              <div className="p-5 bg-gradient-to-r from-purple-700 to-pink-500 text-white flex flex-col items-center text-center relative overflow-hidden select-none shrink-0">
                 <div className="absolute right-0 bottom-0 w-24 h-24 bg-white/10 rounded-full blur-xl"></div>
                 <div className="w-16 h-16 rounded-full bg-white/20 border-2 border-white/60 flex items-center justify-center mb-2 z-10 text-white font-bold text-xl">
                   {currentUser.name ? currentUser.name[0].toUpperCase() : 'LG'}
@@ -641,7 +701,7 @@ export default function App() {
                 </span>
               </div>
 
-              <div className="p-5 space-y-4 text-xs sm:text-sm">
+              <div className="p-5 space-y-4 text-xs sm:text-sm overflow-y-auto flex-grow">
                 <div className="space-y-2.5">
                   <div className="flex justify-between items-center py-2 border-b border-purple-50">
                     <span className="text-gray-500 font-medium">র্যাঙ্ক স্ট্যাটাস:</span>
@@ -658,9 +718,21 @@ export default function App() {
 
                   <div className="flex justify-between items-center py-2">
                     <span className="text-gray-500 font-medium">অ্যাকাউন্টের ধরন:</span>
-                    <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-150 rounded text-[10px] font-extrabold uppercase">
-                      Premium Partner
-                    </span>
+                    {isUserVIP ? (
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 border border-emerald-250 rounded text-[10px] font-extrabold uppercase">
+                        👑 VIP Partner
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setShowProfileModal(false);
+                          handleUpdateTab('owner');
+                        }}
+                        className="px-2 py-0.5 bg-purple-100 hover:bg-purple-200 text-purple-700 hover:text-purple-900 border border-purple-200 rounded text-[10px] font-black uppercase cursor-pointer"
+                      >
+                        ⚡ Upgrade to VIP
+                      </button>
+                    )}
                   </div>
                 </div>
 

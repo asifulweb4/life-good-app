@@ -4,12 +4,9 @@
  */
 
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence } from 'motion/react';
 import { Wallet, LogIn, TrendingUp, RefreshCw, Calendar, ArrowUpRight, AlertCircle, Sparkles, CheckCircle2, Copy, PlusCircle } from 'lucide-react';
 import { Transaction, EarningsState } from '../types';
-
-// ✅ Helper: safely convert any value to fixed decimal string
-const fmt = (val: any): string => Number(val ?? 0).toFixed(2);
 
 interface WalletPanelProps {
   earnings: EarningsState;
@@ -18,6 +15,13 @@ interface WalletPanelProps {
 }
 
 export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSubmitted }: WalletPanelProps) {
+  const currentBalance = Number(earnings?.currentBalance || 0);
+  const todayEarnings = Number(earnings?.todayEarnings || 0);
+  const yesterdayEarnings = Number(earnings?.yesterdayEarnings || 0);
+  const last7DaysEarnings = Number(earnings?.last7DaysEarnings || 0);
+  const totalEarnings = Number(earnings?.totalEarnings || 0);
+  const transactionsList = Array.isArray(earnings?.transactions) ? earnings.transactions : [];
+
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
   const [method, setMethod] = useState<'Bkash' | 'Nagad' | 'Rocket'>('Bkash');
   const [recipient, setRecipient] = useState('');
@@ -34,8 +38,6 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
   const [depositError, setDepositError] = useState('');
   const [depositSuccess, setDepositSuccess] = useState(false);
 
-  const currentBalance = Number(earnings.currentBalance ?? 0);
-
   const handleWithdrawRequest = (e: React.FormEvent) => {
     e.preventDefault();
     const withdrawAmt = Number(amount);
@@ -46,12 +48,12 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
     }
 
     if (isNaN(withdrawAmt) || withdrawAmt <= 0) {
-      setCashoutError('৳ সঠিক উইথড্রয়াল অ্যামাউন্ট প্রদান করুন।');
+      setCashoutError('৳ সঠিক উইথড্রয়াল অ্যামাউন্ট প্রদান করুন।');
       return;
     }
 
     if (withdrawAmt < 250) {
-      setCashoutError('⚠️ সর্বনিম্ন উইথড্রয়াল অ্যামাউন্ট ২৫০ ৳ হতে হবে।');
+      setCashoutError('⚠️ সর্বনিম্ন উইথড্রয়াল অ্যামাউন্ট ২৫০ ৳ হতে হবে।');
       return;
     }
 
@@ -119,7 +121,7 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
           <div className="space-y-0.5">
             <span className="text-xs uppercase font-extrabold tracking-wider opacity-85">আপনার বর্তমান ব্যালেন্স</span>
             <p className="text-3xl sm:text-4xl font-black text-yellow-300">
-              {fmt(earnings.currentBalance)} ৳
+              {currentBalance.toFixed(2)} ৳
             </p>
           </div>
         </div>
@@ -164,7 +166,7 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4" id="wallet-stats-grid">
         <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-purple-100/60 shadow-md shadow-purple-50 flex flex-col justify-between">
           <span className="text-[11px] font-bold text-gray-500 uppercase">আজকের ইনকাম</span>
-          <p className="text-xl font-black text-purple-950 mt-1">{fmt(earnings.todayEarnings)} ৳</p>
+          <p className="text-xl font-black text-purple-950 mt-1">{todayEarnings.toFixed(2)} ৳</p>
           <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-0.5 mt-2">
             <TrendingUp size={10} /> Active
           </span>
@@ -172,19 +174,19 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
 
         <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-purple-100/60 shadow-md shadow-purple-50 flex flex-col justify-between">
           <span className="text-[11px] font-bold text-gray-500 uppercase">গতকালকের ইনকাম</span>
-          <p className="text-xl font-black text-gray-800 mt-1">{fmt(earnings.yesterdayEarnings)} ৳</p>
+          <p className="text-xl font-black text-gray-800 mt-1">{yesterdayEarnings.toFixed(2)} ৳</p>
           <span className="text-[10px] text-gray-500 font-medium mt-2">Yesterday Ledger</span>
         </div>
 
         <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-purple-100/60 shadow-md shadow-purple-50 flex flex-col justify-between">
           <span className="text-[11px] font-bold text-gray-500 uppercase">গত ৭ দিনের ইনকাম</span>
-          <p className="text-xl font-black text-purple-900 mt-1">{fmt(earnings.last7DaysEarnings)} ৳</p>
+          <p className="text-xl font-black text-purple-900 mt-1">{last7DaysEarnings.toFixed(2)} ৳</p>
           <span className="text-[10px] text-purple-600 font-bold mt-2">Rolling 7-day</span>
         </div>
 
         <div className="bg-white/90 backdrop-blur-md rounded-2xl p-4 border border-purple-100/60 shadow-md shadow-purple-50 flex flex-col justify-between">
           <span className="text-[11px] font-bold text-gray-400 uppercase">টোটাল অর্জিত ইনকাম</span>
-          <p className="text-xl font-black text-pink-600 mt-1">{fmt(earnings.totalEarnings)} ৳</p>
+          <p className="text-xl font-black text-pink-600 mt-1">{totalEarnings.toFixed(2)} ৳</p>
           <span className="text-[10px] text-pink-600 font-bold mt-2">Lifetime Total</span>
         </div>
       </div>
@@ -196,9 +198,9 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
           ইনকাম হিস্ট্রি ও ট্রানজেকশন খতিয়ান
         </h3>
 
-        {earnings.transactions.length > 0 ? (
+        {transactionsList.length > 0 ? (
           <div className="divide-y divide-purple-50 space-y-3.5 max-h-[420px] overflow-y-auto pr-1 no-scrollbar">
-            {earnings.transactions.map((t) => (
+            {transactionsList.map((t) => (
               <div
                 key={t.id}
                 className="flex items-center justify-between pt-3.5 first:pt-0 gap-4"
@@ -225,8 +227,7 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                 <div className="flex flex-col items-end gap-1.5 font-mono">
                   <p className={`font-black text-sm ${t.type === 'earning' ? 'text-emerald-600' : 'text-rose-600'
                     }`}>
-                    {/* ✅ FIXED: Number() wrap করা হয়েছে */}
-                    {t.type === 'earning' ? '+' : '-'}{fmt(t.amount)} ৳
+                    {t.type === 'earning' ? '+' : '-'}{Number(t.amount).toFixed(2)} ৳
                   </p>
                   {getStatusBadge(t.status)}
                 </div>
@@ -235,7 +236,7 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
           </div>
         ) : (
           <div className="text-center py-10">
-            <p className="text-sm text-gray-400">ব্যালেন্স হিস্ট্রি ও লেনদেনের সঠিক তালিকা এখানে পাওয়া যাবে।</p>
+            <p className="text-sm text-gray-400">ব্যালেন্স হিস্ট্রি ও লেনদেনের সঠিক তালিকা এখানে পাওয়া যাবে।</p>
           </div>
         )}
       </div>
@@ -248,29 +249,30 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-md w-full border border-purple-100/80 flex flex-col"
+              className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-md w-full border border-purple-100/80 flex flex-col max-h-[90vh]"
               id="withdraw-modal-flow"
             >
-              <div className="p-4 sticky top-0 z-20 bg-gradient-to-r from-purple-700 to-pink-500 text-white flex justify-between items-center shadow-md">
+              {/* Box title frame */}
+              <div className="p-4 bg-gradient-to-r from-purple-700 to-pink-500 text-white flex justify-between items-center">
                 <span className="font-bold text-base flex items-center gap-1.5">
-                  <Wallet size={16} /> লাইভ পেমেন্ট উইথড্রয়াল প্যানেল
+                  <Wallet size={16} /> লাইভ পেমেন্ট উইথড্রয়াল প্যানেল
                 </span>
                 <button
                   onClick={() => setShowWithdrawModal(false)}
-                  className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 text-white cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 text-white"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="p-5">
+              <div className="p-5 overflow-y-auto flex-grow">
                 {cashoutSuccess ? (
                   <div className="text-center py-6 space-y-4">
                     <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
                       <CheckCircle2 size={32} />
                     </div>
                     <div>
-                      <h3 className="text-lg font-black text-emerald-800">পেমেন্ট রিকোয়েস্ট সফল হয়েছে!</h3>
+                      <h3 className="text-lg font-black text-emerald-800">পেমেন্ট রিকোয়েস্ট সফল হয়েছে!</h3>
                       <p className="text-xs text-purple-600 mt-0.5">পদ্ধতি: {method} • প্রাপক: {recipient}</p>
                     </div>
 
@@ -282,7 +284,7 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                     </div>
 
                     <p className="text-[11px] text-gray-500 max-w-sm mx-auto">
-                      আমাদের পেমেন্ট অপারেটর আপনার রিকোয়েস্টটি যাচাই করে আগামী ৪-১২ ঘণ্টার মধ্যে আপনার {method} নাম্বারে টাকা পাঠিয়ে দিবে।
+                      আমাদের পেমেন্ট অপারেটর আপনার রিকোয়েস্টটি যাচাই করে আগামী ৪-১২ ঘণ্টার মধ্যে আপনার {method} নাম্বারে টাকা পাঠিয়ে দিবে।
                     </p>
 
                     <button
@@ -294,17 +296,18 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                   </div>
                 ) : (
                   <form onSubmit={handleWithdrawRequest} className="space-y-4">
+                    {/* Active balance layout info */}
                     <div className="bg-pink-50 border border-pink-100 rounded-2xl p-4 flex items-center justify-between">
                       <div>
-                        <span className="text-[10px] font-bold text-pink-700 uppercase">উদ্ধারযোগ্য ওয়ালেট ব্যালেন্স</span>
-                        {/* ✅ FIXED */}
-                        <p className="text-xl font-black text-pink-600 mt-0.5">{fmt(earnings.currentBalance)} ৳</p>
+                        <span className="text-[10px] font-bold text-pink-700 uppercase">উদ্ধারযোগ্য ওয়ালেট ব্যালেন্স</span>
+                        <p className="text-xl font-black text-pink-600 mt-0.5">{currentBalance.toFixed(2)} ৳</p>
                       </div>
                       <Sparkles className="text-pink-500 animate-spin" style={{ animationDuration: '6s' }} size={18} />
                     </div>
 
+                    {/* Method selecting structure */}
                     <div>
-                      <label className="text-[11px] font-bold text-purple-900 block mb-1.5">উইথড্রয়ার মাধ্যম নির্বাচন করুন</label>
+                      <label className="text-[11px] font-bold text-purple-900 block mb-1.5">উইথড্রয়ার মাধ্যম নির্বাচন করুন</label>
                       <div className="grid grid-cols-3 gap-2">
                         {(['Bkash', 'Nagad', 'Rocket'] as const).map((m) => (
                           <button
@@ -322,6 +325,7 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                       </div>
                     </div>
 
+                    {/* Number block */}
                     <div>
                       <label className="text-[11px] font-bold text-purple-900 block mb-1">১১ ডিজিটের পার্সোনাল নাম্বার</label>
                       <input
@@ -334,8 +338,9 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                       />
                     </div>
 
+                    {/* Cash size block */}
                     <div>
-                      <label className="text-[11px] font-bold text-purple-900 block mb-1">উইথড্রয়েল অ্যামাউন্ট (৳)</label>
+                      <label className="text-[11px] font-bold text-purple-900 block mb-1">উইথড্রয়েল অ্যামাউন্ট (৳)</label>
                       <input
                         type="number"
                         required
@@ -346,6 +351,7 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                       />
                     </div>
 
+                    {/* Notification info */}
                     {cashoutError && (
                       <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-1.5">
                         <AlertCircle size={16} className="shrink-0" />
@@ -353,21 +359,12 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                       </div>
                     )}
 
-                    <div className="flex gap-2 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowWithdrawModal(false)}
-                        className="w-1/3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-sm sm:text-base rounded-xl border border-rose-100 transition-all cursor-pointer"
-                      >
-                        ফিরে যান
-                      </button>
-                      <button
-                        type="submit"
-                        className="w-2/3 py-2.5 bg-gradient-to-r from-purple-700 to-pink-500 hover:opacity-95 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg shadow-pink-100 transition-all cursor-pointer"
-                      >
-                        সাবমিট করুন
-                      </button>
-                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-gradient-to-r from-purple-700 to-pink-500 hover:opacity-95 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg shadow-pink-100 transition-all cursor-pointer"
+                    >
+                      রিকোয়েস্ট সাবমিট করুন
+                    </button>
                   </form>
                 )}
               </div>
@@ -384,42 +381,42 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
               initial={{ scale: 0.95, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-md w-full border border-purple-100/80 flex flex-col"
+              className="bg-white rounded-3xl overflow-hidden shadow-2xl max-w-md w-full border border-purple-100/80 flex flex-col max-h-[90vh]"
               id="deposit-modal-flow"
             >
-              <div className="p-4 sticky top-0 z-20 bg-gradient-to-r from-purple-700 to-pink-500 text-white flex justify-between items-center select-none shadow-md">
+              <div className="p-4 bg-gradient-to-r from-purple-700 to-pink-500 text-white flex justify-between items-center select-none">
                 <span className="font-bold text-base flex items-center gap-1.5 font-sans">
-                  <Sparkles size={16} className="text-yellow-300 animate-pulse" /> কম টাকায় ইনস্ট্যান্ট ডিপোজিট করুন
+                  <Sparkles size={16} className="text-yellow-300 animate-pulse" /> কম টাকায় ইনস্ট্যান্ট ডিপোজিট করুন
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowDepositModal(false)}
-                  className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 text-white cursor-pointer"
+                  className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 text-white"
                 >
                   ✕
                 </button>
               </div>
 
-              <div className="p-5">
+              <div className="p-5 overflow-y-auto flex-grow">
                 {depositSuccess ? (
                   <div className="text-center py-6 space-y-4">
-                    <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+                    <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center mx-auto shadow-inner">
                       <CheckCircle2 size={32} />
                     </div>
                     <div>
-                      <h3 className="text-lg font-black text-emerald-800">ডিপোজিট সফলভাবে যুক্ত হয়েছে!</h3>
+                      <h3 className="text-lg font-black text-amber-800">আবেদন সফলভাবে পাঠানো হয়েছে!</h3>
                       <p className="text-xs text-purple-600 mt-0.5">পদ্ধতি: {depMethod} • প্রেরক: {depSender}</p>
                     </div>
 
                     <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
                       <span className="text-xs font-bold text-purple-700 uppercase block mb-0.5">
-                        যুক্তকৃত নতুন অ্যামাউন্ট
+                        ডিপোজিট আবেদন অ্যামাউন্ট
                       </span>
-                      <p className="text-2xl font-black text-emerald-600">{depAmount} ৳</p>
+                      <p className="text-2xl font-black text-amber-600">{depAmount} ৳</p>
                     </div>
 
                     <p className="text-[11px] text-gray-500">
-                      আপনার টাকাটি সফলভাবে যাচাই করে আপনার ওয়ালেটে সরাসরি যুক্ত করা হয়েছে। আপনি এখন যেকোনো মাইক্রো কাজ এবং প্রিমিয়াম সুযোগগুলোতে যোগ দিতে পারেন!
+                      আপনার ডিপোজিট আবেদনটি সফলভাবে সাবমিট হয়েছে এবং অবস্থা পেন্ডিং রয়েছে। ট্রানজেকশন (TrxID) মিলিয়ে এডমিন যাচাই করার পর ওয়ালেটে টাকা যোগ হবে (সাধারণত ৫-১০ মিনিট সময় লাগবে)।
                     </p>
 
                     <button
@@ -432,16 +429,18 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                   </div>
                 ) : (
                   <form onSubmit={handleDepositRequest} className="space-y-4">
+                    {/* Minimum deposit notice */}
                     <div className="bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-100/65 rounded-2xl p-4 flex items-center justify-between">
                       <div className="space-y-1">
                         <span className="text-[10px] font-black text-purple-700 uppercase tracking-wider block">বিশেষ অফার ও সুযোগ</span>
                         <p className="text-xs font-semibold text-purple-900 leading-snug">
-                          খুবই কম টাকায় মাত্র <span className="text-pink-600 font-extrabold text-sm font-mono">১০ ৳</span> ডিপোজিট করেই কাজ শুরু করতে পারবেন!
+                          খুবই কম টাকায় মাত্র <span className="text-pink-600 font-extrabold text-sm font-mono">১০ ৳</span> ডিপোজিট করেই কাজ শুরু করতে পারবেন!
                         </p>
                       </div>
                       <Sparkles className="text-purple-600 shrink-0" size={20} />
                     </div>
 
+                    {/* Method Selecting */}
                     <div>
                       <label className="text-[11px] font-bold text-purple-900 block mb-1.5">আপনার পেমেন্ট মেথড নির্বাচন করুন</label>
                       <div className="grid grid-cols-3 gap-2">
@@ -461,26 +460,27 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                       </div>
                     </div>
 
-                    <div className="p-3.5 bg-yellow-50/80 border border-yellow-200 rounded-xl space-y-1 text-xs">
+                    {/* Payment Instruction */}
+                    <div className="p-3.5 bg-yellow-50/80 border border-yellow-250/50 rounded-xl space-y-1 text-xs">
                       <p className="text-amber-900 font-bold flex items-center gap-1 leading-none">
-                        📢 টাকা পাঠানোর নিয়ম:
+                        📢 টাকা পাঠানোর নিয়ম:
                       </p>
                       <p className="text-gray-700 leading-normal">
-                        নিচে দেওয়া {depMethod === 'Bkash' ? 'বিকাশ' : depMethod === 'Nagad' ? 'নগদ' : 'রকেট'} পার্সোনাল নাম্বারে টাকা <span className="font-extrabold text-pink-600">Send Money</span> অথবা <span className="font-extrabold text-pink-600">ক্যাশ ইন</span> করুন। নিচে সঠিক তথ্য দিয়ে ফর্মটি জমা দিন।
+                        নিচে দেওয়া {depMethod === 'Bkash' ? 'বিকাশ' : depMethod === 'Nagad' ? 'নগদ' : 'রকেট'} পার্সোনাল নাম্বারে টাকা <span className="font-extrabold text-pink-600">Send Money</span> অথবা <span className="font-extrabold text-pink-600">ক্যাশ ইন</span> করুন। নিচে সঠিক তথ্য দিয়ে ফর্মটি জমা দিন।
                       </p>
-                      <div className="mt-2 p-2 bg-white rounded-lg border border-yellow-100 flex justify-between items-center gap-1 font-mono">
+                      <div className="mt-2 p-2 bg-white rounded-lg border border-yellow-150 flex justify-between items-center gap-1 font-mono">
                         <div>
-                          <span className="text-[10px] text-gray-500 block uppercase font-bold">আমাদের {depMethod === 'Bkash' ? 'বিকাশ' : depMethod === 'Nagad' ? 'নগদ' : 'রকেট'} নাম্বার</span>
+                          <span className="text-[10px] text-gray-505 block uppercase font-bold text-gray-500">আমাদের {depMethod === 'Bkash' ? 'বিকাশ' : depMethod === 'Nagad' ? 'নগদ' : 'রকেট'} নাম্বার</span>
                           <span className="text-sm font-black text-purple-950 font-sans">
-                            {depMethod === 'Bkash' ? '01799887755' : depMethod === 'Nagad' ? '01933221100' : '01544668822'}
+                            {depMethod === 'Bkash' ? '' : depMethod === 'Nagad' ? '01804624046' : ''}
                           </span>
                         </div>
                         <button
                           type="button"
                           onClick={() => {
-                            const num = depMethod === 'Bkash' ? '01799887755' : depMethod === 'Nagad' ? '01933221100' : '01544668822';
+                            const num = depMethod === 'Bkash' ? '' : depMethod === 'Nagad' ? '01804624046' : '';
                             navigator.clipboard.writeText(num);
-                            alert('নাম্বারটি কপি করা হয়েছে!');
+                            alert('নাম্বারটি কপি করা হয়েছে!');
                           }}
                           className="px-2 py-1 bg-purple-50 text-purple-700 text-[10px] font-bold rounded hover:bg-purple-100 flex items-center gap-0.5 cursor-pointer"
                         >
@@ -489,8 +489,9 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                       </div>
                     </div>
 
+                    {/* Sender block */}
                     <div>
-                      <label className="text-[11px] font-bold text-purple-900 block mb-1">১১ ডিজিটের প্রেরক নাম্বার (যে নাম্বার থেকে টাকা পাঠিয়েছেন)</label>
+                      <label className="text-[11px] font-bold text-purple-900 block mb-1">১১ ডিজিটের প্রেরক নাম্বার (যে নাম্বার থেকে টাকা পাঠিয়েছেন)</label>
                       <input
                         type="tel"
                         required
@@ -501,6 +502,7 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                       />
                     </div>
 
+                    {/* Amount block */}
                     <div>
                       <label className="text-[11px] font-bold text-purple-900 block mb-1">পাঠানো টাকার পরিমাণ (৳ - সর্বনিম্ন ১০ ৳)</label>
                       <input
@@ -513,6 +515,7 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                       />
                     </div>
 
+                    {/* Transaction ID block */}
                     <div>
                       <label className="text-[11px] font-bold text-purple-900 block mb-1">ট্রানজেকশন আইডি (bKash/Nagad TrxID)</label>
                       <input
@@ -525,6 +528,7 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                       />
                     </div>
 
+                    {/* Notification info */}
                     {depositError && (
                       <div className="p-3 bg-rose-50 border border-rose-100 rounded-xl text-rose-700 text-xs font-semibold flex items-center gap-1.5">
                         <AlertCircle size={16} className="shrink-0" />
@@ -532,21 +536,12 @@ export default function WalletPanel({ earnings, onWithdrawSubmitted, onDepositSu
                       </div>
                     )}
 
-                    <div className="flex gap-2 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowDepositModal(false)}
-                        className="w-1/3 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-sm sm:text-base rounded-xl border border-rose-100 transition-all cursor-pointer"
-                      >
-                        ফিরে যান
-                      </button>
-                      <button
-                        type="submit"
-                        className="w-2/3 py-2.5 bg-gradient-to-r from-emerald-600 to-purple-700 hover:opacity-95 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg shadow-purple-100 transition-all cursor-pointer"
-                      >
-                        জমা দিন
-                      </button>
-                    </div>
+                    <button
+                      type="submit"
+                      className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-purple-700 hover:opacity-95 text-white font-bold text-sm sm:text-base rounded-xl shadow-lg shadow-purple-100 transition-all cursor-pointer"
+                    >
+                      ডিপোজিট বিবরণ জমা দিন
+                    </button>
                   </form>
                 )}
               </div>

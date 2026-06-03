@@ -145,10 +145,10 @@ export async function queryDb(text: string, params: any[] = []) {
 
   // File fallback simulation
   const store = getLocalStore();
-  
-  if (text.trim().startsWith('SELECT') && (text.includes('FROM users WHERE email =') || text.includes('OR phone ='))) {
+
+  if (text.trim().startsWith('SELECT') && text.includes('FROM users WHERE email =')) {
     const emailParam = params[0];
-    const user = store.users.find((u: any) => u.email.toLowerCase() === emailParam.toLowerCase() || u.phone === emailParam);
+    const user = store.users.find((u: any) => u.email.toLowerCase() === emailParam.toLowerCase());
     return { rows: user ? [user] : [] };
   }
 
@@ -171,15 +171,27 @@ export async function queryDb(text: string, params: any[] = []) {
   }
 
   if (text.includes('UPDATE users SET wallet_balance =')) {
-    // UPDATE users SET wallet_balance = $1, today_earnings = $2, total_earnings = $3 WHERE email = $4
-    const email = params[3].toLowerCase();
-    const userIdx = store.users.findIndex((u: any) => u.email.toLowerCase() === email);
-    if (userIdx !== -1) {
-      store.users[userIdx].wallet_balance = Number(params[0]);
-      store.users[userIdx].today_earnings = Number(params[1]);
-      store.users[userIdx].total_earnings = Number(params[2]);
-      saveLocalStore(store);
-      return { rows: [store.users[userIdx]] };
+    // Supports:
+    // 1. UPDATE users SET wallet_balance = $1, today_earnings = $2, total_earnings = $3 WHERE email = $4
+    // 2. UPDATE users SET wallet_balance = $1 WHERE email = $2
+    if (params.length === 4) {
+      const email = params[3].toLowerCase();
+      const userIdx = store.users.findIndex((u: any) => u.email.toLowerCase() === email);
+      if (userIdx !== -1) {
+        store.users[userIdx].wallet_balance = Number(params[0]);
+        store.users[userIdx].today_earnings = Number(params[1]);
+        store.users[userIdx].total_earnings = Number(params[2]);
+        saveLocalStore(store);
+        return { rows: [store.users[userIdx]] };
+      }
+    } else if (params.length === 2) {
+      const email = params[1].toLowerCase();
+      const userIdx = store.users.findIndex((u: any) => u.email.toLowerCase() === email);
+      if (userIdx !== -1) {
+        store.users[userIdx].wallet_balance = Number(params[0]);
+        saveLocalStore(store);
+        return { rows: [store.users[userIdx]] };
+      }
     }
     return { rows: [] };
   }
@@ -206,6 +218,26 @@ export async function queryDb(text: string, params: any[] = []) {
     const email = params[0].toLowerCase();
     const filtered = store.transactions.filter((t: any) => t.user_email.toLowerCase() === email);
     return { rows: filtered };
+  }
+
+  if (text.includes('SELECT * FROM transactions')) {
+    return { rows: store.transactions };
+  }
+
+  if (text.includes('SELECT * FROM users')) {
+    return { rows: store.users };
+  }
+
+  if (text.includes('UPDATE transactions SET status =')) {
+    const status = params[0];
+    const id = params[1];
+    const txIdx = store.transactions.findIndex((t: any) => t.id === id);
+    if (txIdx !== -1) {
+      store.transactions[txIdx].status = status;
+      saveLocalStore(store);
+      return { rows: [store.transactions[txIdx]] };
+    }
+    return { rows: [] };
   }
 
   if (text.includes('SELECT job_id FROM completed_jobs WHERE user_email =')) {

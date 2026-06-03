@@ -45,7 +45,7 @@ async function startServer() {
           'INSERT INTO transactions(id, user_email, type, amount, title, date, status) VALUES($1, $2, $3, $4, $5, $6, $7)',
           [`tx_ref_${Date.now()}`, email.toLowerCase(), 'earning', 50.00, `রেফারেল সাইনআপ বোনাস (কোড: ${referCode})`, new Date().toISOString().replace('T', ' ').substring(0, 16), 'success']
         );
-        
+
         // Update current user balance if refer code gets them more money
         const newBalance = Number(user.wallet_balance || 250.00) + 50.00;
         await queryDb(
@@ -79,15 +79,19 @@ async function startServer() {
   app.post('/api/login', async (req, res) => {
     try {
       const { email, password } = req.body;
+      const loginId = (email || '').toString().trim();
 
-      if (!email || !password) {
-        return res.status(400).json({ error: 'ইমেইল এবং পাসওয়ার্ড প্রদান করুন।' });
+      if (!loginId || !password) {
+        return res.status(400).json({ error: 'ইমেইল বা ফোন নম্বর এবং পাসওয়ার্ড প্রদান করুন।' });
       }
 
-      // Check by email OR phone
-      const result = await queryDb('SELECT * FROM users WHERE email = $1 OR phone = $1', [email.toLowerCase()]);
+      const normalizedLogin = loginId.toLowerCase();
+      const result = await queryDb(
+        'SELECT * FROM users WHERE lower(email) = $1 OR phone = $2',
+        [normalizedLogin, loginId]
+      );
       if (result.rows.length === 0) {
-        return res.status(400).json({ error: 'প্রদত্ত ইমেইল/নম্বরটি নিবন্ধিত নয়।' });
+        return res.status(400).json({ error: 'প্রদত্ত ইমেইল বা ফোন নম্বর নিবন্ধিত নয়।' });
       }
 
       const user = result.rows[0];
@@ -264,11 +268,10 @@ async function startServer() {
       }
 
       const user = userResult.rows[0];
-
-      // DO NOT update balance immediately. Admin must approve.
       const dateStr = new Date().toISOString().replace('T', ' ').substring(0, 16);
-      
-      // Save deposit record as 'pending' with transaction id and sender info
+
+      // Save deposit record as 'pending' with transaction id and sender info.
+      // Admin will verify and claim/approve this manually in the portal!
       await queryDb(
         'INSERT INTO transactions(id, user_email, type, amount, title, date, status, payment_method, recipient) VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)',
         [`tx_dep_${Date.now()}`, email.toLowerCase(), 'deposit', depositAmt, `ডিপোজিট রিকোয়েস্ট (${method}) - TrxID: ${transactionId}`, dateStr, 'pending', method, sender]
@@ -276,8 +279,8 @@ async function startServer() {
 
       res.json({
         success: true,
-        wallet_balance: Number(user.wallet_balance), // unchanged
-        message: `৳ ${depositAmt} ডিপোজিট রিকোয়েস্ট সফলভাবে সাবমিট হয়েছে! এডমিন ভেরিফাই করলে ব্যালেন্স এড হবে।`
+        wallet_balance: Number(user.wallet_balance),
+        message: `৳ ${depositAmt} ডিপোজিট আবেদনটি সফলভাবে সাবমিট হয়েছে! ট্রানজেকশন (TrxID) মিলিয়ে এডমিন যাচাই করার পর ওয়ালেটে টাকা যোগ হবে (সাধারণত ৫-১০ মিনিট)।`
       });
     } catch (err) {
       console.error('Deposit request error:', err);
@@ -323,66 +326,111 @@ async function startServer() {
     }
   });
 
-  // --- ADMIN ROUTES ---
-  app.get('/api/admin/pending-transactions', async (req, res) => {
+  // --- ADMIN PORTAL API: Get System Stats, Users & Transactions ---
+  app.get('/api/admin/system-stats', async (req, res) => {
     try {
-      if (req.query.email !== 'asiful@gmail.com') return res.status(403).json({ error: 'Forbidden' });
-      const result = await queryDb("SELECT * FROM transactions WHERE status = 'pending' ORDER BY date DESC");
-      res.json({ transactions: result.rows });
+      const usersRes = await queryDb('SELECT * FROM users');
+      const txsRes = await queryDb('SELECT * FROM transactions');
+      res.json({
+        users: usersRes.rows.map((u: any) => ({
+          name: u.name,
+          phone: u.phone,
+          email: u.email,
+          wallet_balance: Number(u.wallet_balance),
+          today_earnings: Number(u.today_earnings),
+          total_earnings: Number(u.total_earnings),
+          rank_status: u.rank_status
+        })),
+        transactions: txsRes.rows
+      });
     } catch (err) {
-      res.status(500).json({ error: 'Server error' });
+      console.error('Admin system-stats failure:', err);
+      res.status(500).json({ error: 'সার্ভার ত্রুটি।' });
     }
   });
 
+  // --- ADMIN PORTAL API: Approve Pending Transaction ---
   app.post('/api/admin/approve-transaction', async (req, res) => {
     try {
-      const { adminEmail, transactionId } = req.body;
-      if (adminEmail !== 'asiful@gmail.com') return res.status(403).json({ error: 'Forbidden' });
-
-      const txRes = await queryDb("SELECT * FROM transactions WHERE id = $1 AND status = 'pending'", [transactionId]);
-      if (txRes.rows.length === 0) return res.status(404).json({ error: 'Transaction not found or not pending' });
-      const tx = txRes.rows[0];
-
-      // If deposit, add to user balance. (If withdraw, balance was already deducted on submit).
-      if (tx.type === 'deposit') {
-        const userRes = await queryDb('SELECT * FROM users WHERE email = $1', [tx.user_email]);
-        if (userRes.rows.length > 0) {
-          const user = userRes.rows[0];
-          const newBal = Number(user.wallet_balance) + Number(tx.amount);
-          await queryDb('UPDATE users SET wallet_balance = $1 WHERE email = $2', [newBal, tx.user_email]);
-        }
+      const { id } = req.body;
+      if (!id) {
+        return res.status(400).json({ error: 'আইডি প্রয়োজন।' });
       }
 
-      await queryDb("UPDATE transactions SET status = 'success' WHERE id = $1", [transactionId]);
-      res.json({ success: true });
+      // Fetch transaction
+      const txs = await queryDb('SELECT * FROM transactions WHERE id = $1', [id]);
+      if (txs.rows.length === 0) {
+        return res.status(404).json({ error: 'ট্রানজেকশন পাওয়া যায়নি।' });
+      }
+
+      const tx = txs.rows[0];
+      if (tx.status !== 'pending') {
+        return res.status(400).json({ error: 'এই ট্রানজেকশনটি পেন্ডিং নয়।' });
+      }
+
+      const userEmail = tx.user_email;
+      const userRes = await queryDb('SELECT * FROM users WHERE email = $1', [userEmail.toLowerCase()]);
+
+      if (userRes.rows.length === 0) {
+        return res.status(404).json({ error: 'ইউজার পাওয়া যায়নি।' });
+      }
+
+      const user = userRes.rows[0];
+      const amount = Number(tx.amount);
+
+      if (tx.type === 'deposit') {
+        // Since it's a deposit approval, we credit the user's wallet
+        const newBalance = Number(user.wallet_balance) + amount;
+        await queryDb('UPDATE users SET wallet_balance = $1 WHERE email = $2', [newBalance, userEmail.toLowerCase()]);
+      }
+
+      // Mark transaction status as 'success'
+      await queryDb('UPDATE transactions SET status = $1 WHERE id = $2', ['success', id]);
+
+      res.json({ success: true, message: 'আবেদনটি সফলভাবে অনুমোদন করা হয়েছে!' });
     } catch (err) {
-      res.status(500).json({ error: 'Server error' });
+      console.error('Approve failure:', err);
+      res.status(500).json({ error: 'সার্ভার ত্রুটি।' });
     }
   });
 
+  // --- ADMIN PORTAL API: Reject Pending Transaction ---
   app.post('/api/admin/reject-transaction', async (req, res) => {
     try {
-      const { adminEmail, transactionId } = req.body;
-      if (adminEmail !== 'asiful@gmail.com') return res.status(403).json({ error: 'Forbidden' });
-
-      const txRes = await queryDb("SELECT * FROM transactions WHERE id = $1 AND status = 'pending'", [transactionId]);
-      if (txRes.rows.length === 0) return res.status(404).json({ error: 'Transaction not found or not pending' });
-      const tx = txRes.rows[0];
-
-      // If withdraw, refund the deducted balance!
-      if (tx.type === 'withdrawal') {
-        const userRes = await queryDb('SELECT * FROM users WHERE email = $1', [tx.user_email]);
-        if (userRes.rows.length > 0) {
-          const user = userRes.rows[0];
-          const newBal = Number(user.wallet_balance) + Number(tx.amount);
-          await queryDb('UPDATE users SET wallet_balance = $1 WHERE email = $2', [newBal, tx.user_email]);
-        }
+      const { id } = req.body;
+      if (!id) {
+        return res.status(400).json({ error: 'আইডি প্রয়োজন।' });
       }
 
-      await queryDb("UPDATE transactions SET status = 'failed' WHERE id = $1", [transactionId]);
-      res.json({ success: true });
+      // Fetch transaction
+      const txs = await queryDb('SELECT * FROM transactions WHERE id = $1', [id]);
+      if (txs.rows.length === 0) {
+        return res.status(404).json({ error: 'ট্রানজেকশন পাওয়া যায়নি।' });
+      }
+
+      const tx = txs.rows[0];
+      if (tx.status !== 'pending') {
+        return res.status(400).json({ error: 'এই ট্রানজেকশনটি পেন্ডিং নয়।' });
+      }
+
+      const userEmail = tx.user_email;
+      const userRes = await queryDb('SELECT * FROM users WHERE email = $1', [userEmail.toLowerCase()]);
+      const amount = Number(tx.amount);
+
+      if (tx.type === 'withdrawal' && userRes.rows.length > 0) {
+        // Return withdrawn amount back to the user's wallet balance
+        const user = userRes.rows[0];
+        const newBalance = Number(user.wallet_balance) + amount;
+        await queryDb('UPDATE users SET wallet_balance = $1 WHERE email = $2', [newBalance, userEmail.toLowerCase()]);
+      }
+
+      // Mark transaction status as 'failed' (rejected)
+      await queryDb('UPDATE transactions SET status = $1 WHERE id = $2', ['failed', id]);
+
+      res.json({ success: true, message: 'আবেদনটি বাতিল/প্রত্যাখ্যান করা হয়েছে!' });
     } catch (err) {
-      res.status(500).json({ error: 'Server error' });
+      console.error('Reject failure:', err);
+      res.status(500).json({ error: 'সার্ভার ত্রুটি।' });
     }
   });
 
@@ -403,7 +451,9 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Unified Full-Stack Express Server started on http://localhost:${PORT}`);
+    console.log(`🚀 Unified Full-Stack Express Server started!`);
+    console.log(`📡 Local view (for your browser): http://localhost:${PORT}`);
+    console.log(`🌐 Public bind: http://0.0.0.0:${PORT}`);
   });
 }
 
